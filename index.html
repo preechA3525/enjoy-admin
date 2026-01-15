@@ -17,10 +17,7 @@
             position: fixed; top:0; left:0; width:100%; height:100%; background: #1a1a1a; 
             z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white;
         }
-        .pin-input { 
-            font-size: 32px; letter-spacing: 15px; text-align: center; width: 220px; 
-            padding: 12px; border-radius: 12px; border: none; margin-top: 20px; color: #333;
-        }
+        .pin-input { font-size: 32px; letter-spacing: 15px; text-align: center; width: 220px; padding: 12px; border-radius: 12px; border: none; margin-top: 20px; color: #333; }
 
         .container { max-width: 600px; margin: auto; display: none; }
         .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 15px; }
@@ -34,7 +31,6 @@
         .btn-search { background: var(--primary); color: white; min-width: 80px; }
         .btn-logout { background: #555; color: white; padding: 6px 12px; font-size: 12px; }
 
-        /* ปุ่มจัดการแต้มแบบใหม่ */
         .points-action-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
         .btn-add { background: var(--primary); color: white; padding: 15px; font-size: 16px; }
         .btn-minus { background: var(--danger); color: white; padding: 15px; font-size: 16px; }
@@ -50,7 +46,6 @@
         
         .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; }
         .btn-page { flex: 1; background: #546e7a; color: white; margin: 0 5px; padding: 12px; }
-        
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); }
         .modal-content { background: white; margin: 15% auto; padding: 20px; width: 90%; max-width: 400px; border-radius: 15px; }
     </style>
@@ -59,7 +54,7 @@
 
 <div id="loginOverlay">
     <div style="font-size: 22px; font-weight: bold; letter-spacing: 1px;">☕ Enjoy Cafe Admin</div>
-    <div style="margin-top: 15px; color: #ccc; font-size: 14px;">กรุณาใส่รหัสผ่าน</div>
+    <div style="margin-top: 15px; color: #ccc; font-size: 14px;">กรุณาใส่รหัสผ่าน 4 หลัก</div>
     <input type="password" id="pinField" class="pin-input" maxlength="4" inputmode="numeric" autocomplete="off">
     <button onclick="checkPIN()" style="margin-top: 20px; width: 220px; background: #2e7d32; color: white; border-radius: 12px; font-size: 18px; height: 50px;">เข้าสู่ระบบ</button>
 </div>
@@ -96,8 +91,8 @@
         <button onclick="exportToExcel()" style="background:#388e3c; color:white; width:100%; margin-bottom:12px; border-radius:8px; padding:12px;">📥 โหลด Excel</button>
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
-            <select id="sortBy" onchange="resetAndLoad()"><option value="lastUpdated">ล่าสุด</option><option value="points">เรียงแต้ม</option></select>
-            <select id="sortOrder" onchange="resetAndLoad()"><option value="desc">มาก➔น้อย</option><option value="asc">น้อย➔มาก</option></select>
+            <select id="sortBy" onchange="applySortAndRender()"><option value="lastUpdated">เรียงล่าสุด</option><option value="points">เรียงแต้ม</option></select>
+            <select id="sortOrder" onchange="applySortAndRender()"><option value="desc">มาก➔น้อย</option><option value="asc">น้อย➔มาก</option></select>
         </div>
 
         <div class="table-container">
@@ -166,15 +161,10 @@
         });
     }
 
-    // ฟังก์ชันปรับปรุงใหม่: รับค่า type ว่าจะบวกหรือลบ
     function updatePoints(type) {
         let val = parseInt(document.getElementById('adjustAmount').value);
-        if(isNaN(val) || val <= 0) return alert("กรุณาใส่ตัวเลขที่มากกว่า 0");
-        
-        // ถ้าเป็นลบ ให้คูณค่าด้วย -1
-        if(type === 'minus') {
-            val = val * -1;
-        }
+        if(isNaN(val) || val <= 0) return alert("กรุณาใส่ตัวเลข");
+        if(type === 'minus') val = val * -1;
 
         const now = Date.now();
         db.ref('customers/' + selectedId).transaction(c => {
@@ -186,10 +176,10 @@
         }, (err) => {
             if(!err) {
                 db.ref('point_history/' + selectedId).push({ amount: val, timestamp: now });
-                alert(type === 'plus' ? "เพิ่มแต้มสำเร็จ" : "ลดแต้มสำเร็จ");
+                alert("บันทึกสำเร็จ");
                 document.getElementById('adjustAmount').value = "";
                 searchCustomer();
-                loadData();
+                loadData(); 
             }
         });
     }
@@ -199,17 +189,29 @@
             if(!snapshot.exists()) return;
             const data = snapshot.val();
             cachedData = Object.keys(data).map(k => ({
-                id: k, points: data[k].points || 0, lastUpdated: data[k].lastUpdated || 0
+                id: k, 
+                points: data[k].points || 0, 
+                lastUpdated: data[k].lastUpdated || 0 
             }));
             document.getElementById('totalMembers').innerText = `สมาชิก: ${cachedData.length.toLocaleString()} ราย`;
-            const sortBy = document.getElementById('sortBy').value;
-            const order = document.getElementById('sortOrder').value;
-            cachedData.sort((a, b) => {
-                let vA = a[sortBy], vB = b[sortBy];
-                return order === 'desc' ? (vB > vA ? 1 : -1) : (vA > vB ? 1 : -1);
-            });
-            renderTable();
+            applySortAndRender();
         });
+    }
+
+    // ฟังก์ชันการเรียงลำดับที่ปรับปรุงใหม่
+    function applySortAndRender() {
+        const sortBy = document.getElementById('sortBy').value;
+        const order = document.getElementById('sortOrder').value;
+
+        cachedData.sort((a, b) => {
+            let vA = a[sortBy];
+            let vB = b[sortBy];
+            // ใช้การลบกันเพื่อความแม่นยำในการเรียงตัวเลข
+            return order === 'desc' ? vB - vA : vA - vB;
+        });
+        
+        currentPage = 1; 
+        renderTable();
     }
 
     function renderTable() {
@@ -218,14 +220,13 @@
         const tbody = document.getElementById('tableBody');
         tbody.innerHTML = "";
         pageItems.forEach((item, index) => {
-            tbody.innerHTML += `<tr><td>${start+index+1}</td><td><b>${item.id}</b></td><td>${item.points.toLocaleString()}</td></tr>`;
+            tbody.innerHTML += `<tr><td>${start+index+1}</td><td><b>${item.id}</b></td><td style="color:var(--primary); font-weight:bold;">${item.points.toLocaleString()}</td></tr>`;
         });
         document.getElementById('pageDisplay').innerText = `${currentPage} / ${Math.ceil(cachedData.length/pageSize)}`;
         document.getElementById('prevBtn').disabled = currentPage === 1;
         document.getElementById('nextBtn').disabled = currentPage * pageSize >= cachedData.length;
     }
 
-    function resetAndLoad() { currentPage = 1; loadData(); }
     function changePage(s) { currentPage += s; renderTable(); }
 
     function showHistory() {
