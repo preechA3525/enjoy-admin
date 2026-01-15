@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Enjoy Cafe Mobile Admin</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        :root { --primary: #2e7d32; --accent: #ef6c00; --danger: #c62828; --bg: #f4f7f6; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); margin: 0; padding: 10px; color: #333; }
+        
+        .container { max-width: 600px; margin: auto; }
+        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 15px; }
+        h2 { font-size: 1.1rem; color: var(--primary); margin: 0 0 12px 0; }
+        
+        .search-group { display: flex; gap: 8px; margin-bottom: 10px; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; background: white; }
+        
+        button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .btn-search { background: var(--primary); color: white; min-width: 80px; }
+        .btn-update { background: var(--accent); color: white; width: 100%; margin-top: 10px; }
+        .btn-excel { background: #388e3c; color: white; width: 100%; margin-bottom: 10px; }
+
+        .total-badge { background: #e8f5e9; color: var(--primary); padding: 5px 12px; border-radius: 20px; font-size: 14px; font-weight: bold; margin-bottom: 10px; display: inline-block; }
+
+        .sort-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+        #resultArea { display: none; background: #e8f5e9; border: 1px solid #c8e6c9; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+        .points-val { font-size: 42px; font-weight: bold; color: var(--danger); text-align: center; margin: 5px 0; }
+        
+        .table-container { overflow-x: auto; background: white; border-radius: 8px; border: 1px solid #eee; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th { background: #f8f9fa; padding: 12px 10px; text-align: left; color: #666; border-bottom: 2px solid #eee; }
+        td { padding: 14px 10px; border-bottom: 1px solid #f0f0f0; }
+        
+        .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; }
+        .btn-page { flex: 1; background: #546e7a; color: white; margin: 0 5px; }
+
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); }
+        .modal-content { background: white; margin: 15% auto; padding: 20px; width: 90%; max-width: 400px; border-radius: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <h2>☕ จัดการสมาชิก Enjoy Cafe</h2>
+        <div class="search-group">
+            <input type="text" id="phoneInput" placeholder="ค้นหาเบอร์ลูกค้า..." inputmode="tel">
+            <button class="btn-search" onclick="searchCustomer()">ค้นหา</button>
+        </div>
+
+        <div id="resultArea">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <b id="idDisplay">-</b>
+                <button onclick="showHistory()" style="background:#0277bd; color:white; padding:5px 10px; font-size:12px; border-radius:5px;">📜 ดูประวัติ</button>
+            </div>
+            <div class="points-val" id="pointsDisplay">0</div>
+            <div style="background:white; padding:10px; border-radius:8px;">
+                <input type="number" id="adjustAmount" placeholder="เพิ่ม/ลดแต้ม (+/-)" inputmode="numeric">
+                <button class="btn-update" onclick="updatePoints()">✅ บันทึกแต้ม</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div id="totalMembers" class="total-badge">จำนวนสมาชิกทั้งหมด: 0 ราย</div>
+        <button class="btn-excel" onclick="exportToExcel()">📥 โหลดข้อมูล Excel</button>
+        
+        <div class="sort-bar">
+            <select id="sortBy" onchange="resetAndLoad()">
+                <option value="lastUpdated">ล่าสุด</option>
+                <option value="points">จำนวนแต้ม</option>
+                <option value="id">เบอร์โทร</option>
+            </select>
+            <select id="sortOrder" onchange="resetAndLoad()">
+                <option value="desc">มาก ➔ น้อย</option>
+                <option value="asc">น้อย ➔ มาก</option>
+            </select>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">ลำดับ</th>
+                        <th>เบอร์โทร</th>
+                        <th>แต้ม</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+
+        <div class="pagination">
+            <button id="prevBtn" class="btn-page" onclick="changePage(-1)">ก่อนหน้า</button>
+            <span id="pageDisplay">1/1</span>
+            <button id="nextBtn" class="btn-page" onclick="changePage(1)">ถัดไป</button>
+        </div>
+    </div>
+</div>
+
+<div id="historyModal" class="modal">
+    <div class="modal-content">
+        <h3 style="margin-top:0;">📜 ประวัติการรับแต้ม</h3>
+        <div id="historyList" style="max-height: 300px; overflow-y: auto;"></div>
+        <button onclick="closeModal()" style="width:100%; margin-top:15px; background:#eee; border-radius:8px;">ปิด</button>
+    </div>
+</div>
+
+<script>
+    // --- Firebase Config ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyDA0IgzG0JBN6b8ZTgGiyjP75-Udhrby7A",
+        authDomain: "point-system-dc140.firebaseapp.com",
+        databaseURL: "https://point-system-dc140-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "point-system-dc140",
+        storageBucket: "point-system-dc140.firebasestorage.app",
+        messagingSenderId: "419594986748",
+        appId: "1:419594986748:web:7f792375cde20b55736379",
+        measurementId: "G-RPXCCLLYPF"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    
+    let selectedId = null;
+    let currentPage = 1;
+    const pageSize = 50;
+    let cachedData = [];
+
+    function searchCustomer() {
+        const id = document.getElementById('phoneInput').value.trim();
+        if(!id) return;
+        db.ref('customers/' + id).once('value', snapshot => {
+            if(snapshot.exists()) {
+                selectedId = id;
+                document.getElementById('idDisplay').innerText = "ลูกค้า: " + id;
+                document.getElementById('pointsDisplay').innerText = (snapshot.val().points || 0).toLocaleString();
+                document.getElementById('resultArea').style.display = 'block';
+            } else { alert("ไม่พบข้อมูลลูกค้านี้"); }
+        });
+    }
+
+    function updatePoints() {
+        const val = parseInt(document.getElementById('adjustAmount').value);
+        if(isNaN(val)) return alert("ใส่ตัวเลขเท่านั้น");
+        const now = Date.now();
+        db.ref('customers/' + selectedId).transaction(c => {
+            if(c) { c.points = (c.points || 0) + val; c.lastUpdated = now; }
+            return c;
+        }, (err) => {
+            if(!err) {
+                db.ref('point_history/' + selectedId).push({ amount: val, timestamp: now });
+                alert("บันทึกแต้มสำเร็จ");
+                searchCustomer();
+                loadData();
+            }
+        });
+    }
+
+    function loadData() {
+        db.ref('customers').once('value', snapshot => {
+            if(!snapshot.exists()) {
+                document.getElementById('totalMembers').innerText = "จำนวนสมาชิกทั้งหมด: 0 ราย";
+                return;
+            }
+            const data = snapshot.val();
+            cachedData = Object.keys(data).map(k => ({
+                id: k,
+                points: data[k].points || 0,
+                lastUpdated: data[k].lastUpdated || 0
+            }));
+
+            // แสดงจำนวนสมาชิกทั้งหมด
+            document.getElementById('totalMembers').innerText = `จำนวนสมาชิกทั้งหมด: ${cachedData.length.toLocaleString()} ราย`;
+
+            const sortBy = document.getElementById('sortBy').value;
+            const order = document.getElementById('sortOrder').value;
+            cachedData.sort((a, b) => {
+                let vA = a[sortBy], vB = b[sortBy];
+                return order === 'desc' ? (vB > vA ? 1 : -1) : (vA > vB ? 1 : -1);
+            });
+
+            renderTable();
+        });
+    }
+
+    function renderTable() {
+        const start = (currentPage - 1) * pageSize;
+        const pageItems = cachedData.slice(start, start + pageSize);
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = "";
+        
+        pageItems.forEach((item, index) => {
+            const rowNumber = start + index + 1; // คำนวณเลขลำดับตามหน้า
+            tbody.innerHTML += `
+                <tr>
+                    <td style="color:#888;">${rowNumber}</td>
+                    <td><b>${item.id}</b></td>
+                    <td style="color:var(--primary); font-weight:bold;">${item.points.toLocaleString()}</td>
+                </tr>`;
+        });
+        
+        document.getElementById('pageDisplay').innerText = `${currentPage} / ${Math.ceil(cachedData.length/pageSize)}`;
+        document.getElementById('prevBtn').disabled = currentPage === 1;
+        document.getElementById('nextBtn').disabled = currentPage * pageSize >= cachedData.length;
+    }
+
+    function resetAndLoad() { currentPage = 1; loadData(); }
+    function changePage(s) { currentPage += s; renderTable(); }
+
+    function showHistory() {
+        document.getElementById('historyModal').style.display = 'block';
+        const list = document.getElementById('historyList');
+        list.innerHTML = "โหลดประวัติ...";
+        db.ref('point_history/' + selectedId).limitToLast(10).once('value', s => {
+            list.innerHTML = "";
+            s.forEach(c => {
+                const log = c.val();
+                const d = new Date(log.timestamp).toLocaleDateString('th-TH');
+                list.innerHTML = `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee;">
+                    <span>${d}</span>
+                    <b style="color:${log.amount>=0?'green':'red'}">${log.amount>=0?'+':''}${log.amount}</b>
+                </div>` + list.innerHTML;
+            });
+        });
+    }
+
+    function exportToExcel() {
+        const rows = cachedData.map((d, i) => ({ "ลำดับที่": i+1, "เบอร์โทร": d.id, "แต้ม": d.points }));
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Members");
+        XLSX.writeFile(wb, "EnjoyCafe_Members.xlsx");
+    }
+
+    function closeModal() { document.getElementById('historyModal').style.display = 'none'; }
+    loadData();
+</script>
+</body>
+</html>
