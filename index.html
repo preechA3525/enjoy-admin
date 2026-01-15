@@ -30,10 +30,14 @@
         .search-group { display: flex; gap: 8px; margin-bottom: 10px; }
         input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; background: white; }
         
-        button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        button { border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; }
         .btn-search { background: var(--primary); color: white; min-width: 80px; }
-        .btn-update { background: var(--accent); color: white; width: 100%; margin-top: 10px; }
         .btn-logout { background: #555; color: white; padding: 6px 12px; font-size: 12px; }
+
+        /* ปุ่มจัดการแต้มแบบใหม่ */
+        .points-action-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .btn-add { background: var(--primary); color: white; padding: 15px; font-size: 16px; }
+        .btn-minus { background: var(--danger); color: white; padding: 15px; font-size: 16px; }
 
         .total-badge { background: #e8f5e9; color: var(--primary); padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: bold; margin-bottom: 10px; display: inline-block; }
         #resultArea { display: none; background: #e8f5e9; border: 1px solid #c8e6c9; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
@@ -45,7 +49,7 @@
         td { padding: 14px 10px; border-bottom: 1px solid #f0f0f0; }
         
         .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; }
-        .btn-page { flex: 1; background: #546e7a; color: white; margin: 0 5px; }
+        .btn-page { flex: 1; background: #546e7a; color: white; margin: 0 5px; padding: 12px; }
         
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); }
         .modal-content { background: white; margin: 15% auto; padding: 20px; width: 90%; max-width: 400px; border-radius: 15px; }
@@ -55,7 +59,7 @@
 
 <div id="loginOverlay">
     <div style="font-size: 22px; font-weight: bold; letter-spacing: 1px;">☕ Enjoy Cafe Admin</div>
-    <div style="margin-top: 15px; color: #ccc; font-size: 14px;">รหัสผ่านคือ 3525</div>
+    <div style="margin-top: 15px; color: #ccc; font-size: 14px;">กรุณาใส่รหัสผ่าน</div>
     <input type="password" id="pinField" class="pin-input" maxlength="4" inputmode="numeric" autocomplete="off">
     <button onclick="checkPIN()" style="margin-top: 20px; width: 220px; background: #2e7d32; color: white; border-radius: 12px; font-size: 18px; height: 50px;">เข้าสู่ระบบ</button>
 </div>
@@ -78,8 +82,11 @@
             </div>
             <div class="points-val" id="pointsDisplay">0</div>
             <div style="background:white; padding:12px; border-radius:10px;">
-                <input type="number" id="adjustAmount" placeholder="เพิ่ม/ลดแต้ม (+/-)" inputmode="numeric">
-                <button class="btn-update" onclick="updatePoints()">✅ บันทึกแต้ม</button>
+                <input type="number" id="adjustAmount" placeholder="ระบุจำนวนแต้ม..." inputmode="numeric">
+                <div class="points-action-group">
+                    <button class="btn-add" onclick="updatePoints('plus')">➕ เพิ่มแต้ม</button>
+                    <button class="btn-minus" onclick="updatePoints('minus')">➖ ลดแต้ม</button>
+                </div>
             </div>
         </div>
     </div>
@@ -146,7 +153,6 @@
         document.getElementById('mainApp').style.display = 'none';
     }
 
-    // ฟังก์ชันอื่นๆ เหมือนเดิม
     function searchCustomer() {
         const id = document.getElementById('phoneInput').value.trim();
         if(!id) return;
@@ -160,17 +166,27 @@
         });
     }
 
-    function updatePoints() {
-        const val = parseInt(document.getElementById('adjustAmount').value);
-        if(isNaN(val)) return alert("ใส่ตัวเลข");
+    // ฟังก์ชันปรับปรุงใหม่: รับค่า type ว่าจะบวกหรือลบ
+    function updatePoints(type) {
+        let val = parseInt(document.getElementById('adjustAmount').value);
+        if(isNaN(val) || val <= 0) return alert("กรุณาใส่ตัวเลขที่มากกว่า 0");
+        
+        // ถ้าเป็นลบ ให้คูณค่าด้วย -1
+        if(type === 'minus') {
+            val = val * -1;
+        }
+
         const now = Date.now();
         db.ref('customers/' + selectedId).transaction(c => {
-            if(c) { c.points = (c.points || 0) + val; c.lastUpdated = now; }
+            if(c) { 
+                c.points = (c.points || 0) + val; 
+                c.lastUpdated = now; 
+            }
             return c;
         }, (err) => {
             if(!err) {
                 db.ref('point_history/' + selectedId).push({ amount: val, timestamp: now });
-                alert("บันทึกเรียบร้อย");
+                alert(type === 'plus' ? "เพิ่มแต้มสำเร็จ" : "ลดแต้มสำเร็จ");
                 document.getElementById('adjustAmount').value = "";
                 searchCustomer();
                 loadData();
