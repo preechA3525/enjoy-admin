@@ -3,7 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="EnjoyAdmin">
+    <link rel="apple-touch-icon" href="https://via.placeholder.com/180/2e7d32/ffffff?text=Enjoy">
+
     <title>Enjoy Cafe - Admin Protected</title>
+    
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -11,7 +18,7 @@
     <style>
         :root { --primary: #2e7d32; --accent: #ef6c00; --danger: #c62828; --bg: #f4f7f6; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); margin: 0; padding: 10px; color: #333; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); margin: 0; padding: 10px; color: #333; padding-top: env(safe-area-inset-top); }
         
         #loginOverlay { 
             position: fixed; top:0; left:0; width:100%; height:100%; background: #1a1a1a; 
@@ -25,9 +32,9 @@
         h2 { font-size: 1.1rem; color: var(--primary); margin: 0; }
         
         .search-group { display: flex; gap: 8px; margin-bottom: 10px; }
-        input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; background: white; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; background: white; -webkit-appearance: none; }
         
-        button { border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        button { border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; -webkit-appearance: none; }
         .btn-search { background: var(--primary); color: white; min-width: 80px; }
         .btn-logout { background: #555; color: white; padding: 6px 12px; font-size: 12px; }
 
@@ -198,7 +205,6 @@
         });
     }
 
-    // ฟังก์ชันการเรียงลำดับที่ปรับปรุงใหม่
     function applySortAndRender() {
         const sortBy = document.getElementById('sortBy').value;
         const order = document.getElementById('sortOrder').value;
@@ -206,7 +212,6 @@
         cachedData.sort((a, b) => {
             let vA = a[sortBy];
             let vB = b[sortBy];
-            // ใช้การลบกันเพื่อความแม่นยำในการเรียงตัวเลข
             return order === 'desc' ? vB - vA : vA - vB;
         });
         
